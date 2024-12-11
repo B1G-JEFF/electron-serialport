@@ -1,62 +1,49 @@
-const { app, BrowserWindow } = require('electron')
-const path = require('path')
-const url = require('url')
+const { app, BrowserWindow, ipcMain } = require('electron');
+const { SerialPort, ReadlineParser } = require('serialport');
 
-// Keep a global reference of the window object, if you don't, the window will
-// be closed automatically when the JavaScript object is garbage collected.
-let mainWindow
+let mainWindow;
 
-function createWindow() {
-    // Create the browser window.
-    mainWindow = new BrowserWindow({
-        width: 800,
-        height: 600,
-        backgroundColor: "#ccc",
-        webPreferences: {
-            nodeIntegration: true, // to allow require
-            contextIsolation: false, // allow use with Electron 12+
-            preload: path.join(__dirname, 'preload.js')
-        }
-    })
+app.on('ready', () => {
+  mainWindow = new BrowserWindow({
+    width: 800,
+    height: 600,
+    autoHideMenuBar:true,
+    icon:__dirname+"./arduino_22429.ico",
+    webPreferences: {
+      preload: __dirname + '/preload.js',
+      contextIsolation: true,
+      nodeIntegration: false
+    },
+  });
 
-    // and load the index.html of the app.
-    mainWindow.loadURL(url.format({
-        pathname: path.join(__dirname, 'index.html'),
-        protocol: 'file:',
-        slashes: true
-    }))
+  mainWindow.loadFile('index.html');
+});
 
-    // Open the DevTools.
-    // mainWindow.webContents.openDevTools()
+ipcMain.handle('list-ports', async () => {
+  try {
+    const ports = await SerialPort.list();
+    return ports.map((port) => port.path);
+  } catch (error) {
+    console.error('Erro ao listar portas:', error);
+    return [];
+  }
+});
 
-    // Emitted when the window is closed.
-    mainWindow.on('closed', function() {
-        // Dereference the window object, usually you would store windows
-        // in an array if your app supports multi windows, this is the time
-        // when you should delete the corresponding element.
-        mainWindow = null
-    })
-}
+ipcMain.on('start-serial', (event, port) => {
+  const serialPort = new SerialPort({
+    path: port,
+    baudRate: 9600
+  });
 
-// This method will be called when Electron has finished
-// initialization and is ready to create browser windows.
-// Some APIs can only be used after this event occurs.
-app.on('ready', createWindow)
+  const parser = new ReadlineParser();
+  serialPort.pipe(parser);
 
-// Quit when all windows are closed.
-app.on('window-all-closed', function() {
-    // On OS X it is common for applications and their menu bar
-    // to stay active until the user quits explicitly with Cmd + Q
-    app.quit()
-})
+  parser.on('data', (data) => {
+    console.log('Data received: ', data);
+    mainWindow.webContents.send('serial-data', data);
+  });
 
-app.on('activate', function() {
-    // On OS X it's common to re-create a window in the app when the
-    // dock icon is clicked and there are no other windows open.
-    if (mainWindow === null) {
-        createWindow()
-    }
-})
-
-// In this file you can include the rest of your app's specific main process
-// code. You can also put them in separate files and require them here.
+  serialPort.on('error', (err) => {
+    console.error('Error: ', err.message);
+  });
+});

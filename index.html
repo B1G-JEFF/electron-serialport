@@ -1,24 +1,166 @@
 <!DOCTYPE html>
-<html>
-
+<html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <title>Hello World!!</title>
-    <style>
-        table { border-collapse: collapse; }
-        table, th, td { border: 1px solid black; }
-    </style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Leitor de Altura - Paralelepípedo</title>
 </head>
-
 <body>
-    <h1>Hello World!</h1>
+    <style>
+        body {
+  margin: 0;
+  font-family: 'Arial', sans-serif;
+  background-color: #f5f5f5;
+  color: #333;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  height: 100vh;
+  overflow: hidden;
+}
 
-    We are using Node.js <span id="node-version"></span>, Chromium <span id="chrome-version"></span>, Electron <span id="electron-version"></span>, and Serialport <span id="serialport-version"></span>
+header {
+  width: 100%;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 20px;
+  background-color: #fff;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+}
 
-    <div id="error"></div>
-    <div id="ports"></div>
+header select, header button {
+  font-size: 1rem;
+  padding: 10px 15px;
+  border: 1px solid #ccc;
+  border-radius: 5px;
+  background-color: #fff;
+  cursor: pointer;
+  margin-left: 4px;
+  margin-right: 4px;
+}
+
+main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  text-align: center;
+}
+
+main #output {
+  font-size: 2rem;
+  margin-bottom: 20px;
+  padding: 20px;
+  background-color: #fff;
+  border: 1px solid #ccc;
+  border-radius: 10px;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+  width: 80%;
+  max-width: 400px;
+}
+
+main .options {
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+  width: 100%;
+  max-width: 400px;
+}
+
+main .options label {
+  font-weight: bold;
+}
+
+main .options input {
+  font-size: 1rem;
+  padding: 10px;
+  border: 1px solid #ccc;
+  border-radius: 5px;
+}
+    </style>
+  <header>
+    <select id="ports"></select>
+    <button id="start">Iniciar Leitura</button>
+  </header>
+
+  <main>
+    <h3>Leitura do sensor</h3>
+    <div id="output">Aguardando leitura...</div>
+
+    <div class="options">
+      <label for="width">Largura do paralelepípedo (cm):</label>
+      <input type="number" id="width" placeholder="Exemplo: 10" />
+
+      <label for="length">Comprimento do paralelepípedo (cm):</label>
+      <input type="number" id="length" placeholder="Exemplo: 20" />
+
+      <label for="sensorHeight">Altura do sensor (cm):</label>
+      <input type="number" id="sensorHeight" placeholder="Exemplo: 100" />
+
+      <div id="volume">Volume do paralelepípedo: --</div>
+    </div>
+  </main>
+
+  <script>
+    // Popula o select com as portas disponíveis
+    async function populatePorts() {
+      const ports = await window.serialAPI.listPorts();
+      const select = document.getElementById('ports');
+      select.innerHTML = ''; // Limpa opções existentes
+      if (ports.length === 0) {
+        select.innerHTML = '<option value="">Nenhuma porta encontrada</option>';
+      } else {
+        ports.forEach((port) => {
+          const option = document.createElement('option');
+          option.value = port;
+          option.textContent = port;
+          select.appendChild(option);
+        });
+      }
+    }
+
+    // Calcula o volume do paralelepípedo
+    function calculateVolume(distance, width, length, sensorHeight) {
+      const height = sensorHeight - distance; 
+      if (height <= 0) return 0; 
+      const volume = width * length * height; 
+      return volume.toFixed(2);
+    }
+
+    // Chama a função ao carregar a página
+    window.onload = populatePorts;
+
+    // Inicia a leitura da porta selecionada
+    document.getElementById('start').addEventListener('click', () => {
+      const port = document.getElementById('ports').value;
+      if (port) {
+        window.serialAPI.startSerial(port);
+      } else {
+        alert('Selecione uma porta primeiro!');
+      }
+    });
+
+    // Processa os dados recebidos do sensor
+    window.serialAPI.onSerialData((data) => {
+      // Extrai apenas o número da leitura
+      const match = data.match(/\d+/); // Captura o número na string "Distancia: X cm"
+      const distance = match ? parseInt(match[0], 10) : null;
+
+      if (distance !== null) {
+        const width = parseFloat(document.getElementById('width').value || 0);
+        const length = parseFloat(document.getElementById('length').value || 0);
+        const sensorHeight = parseFloat(document.getElementById('sensorHeight').value || 0);
+
+        // Calcula o volume e atualiza a interface
+        const volume = calculateVolume(distance, width, length, sensorHeight);
+        document.getElementById('output').textContent = `${distance} cm`;
+        document.getElementById('volume').textContent = `Volume do paralelepípedo: ${volume} cm³`;
+      } else {
+        document.getElementById('output').textContent = 'Erro na leitura';
+      }
+    });
+  </script>
 </body>
-
-<script src="./renderer.js"></script>
-
 </html>
